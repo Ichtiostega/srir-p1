@@ -4,8 +4,6 @@
 #include <math.h>
 #include "sprng_cpp.h"
 
-#define SEED 385456376
-
 #define XSIZE 20
 #define YSIZE 20
 
@@ -35,7 +33,7 @@ int main( int argc, char *argv[] )
     int gtype = 3;
     MPI_Bcast(&gtype,1,MPI_INT,0,MPI_COMM_WORLD);
     stream = SelectType(gtype);
-    stream->init_sprng(streamnum,nstreams,SEED,SPRNG_DEFAULT);
+    stream->init_sprng(streamnum,nstreams,make_sprng_seed(),SPRNG_DEFAULT);
 
     // Choosing amount of times that we generate
     // a path to the sides of the plate. 
@@ -59,6 +57,10 @@ int main( int argc, char *argv[] )
         // MPI_Bcast(&s, 1, MPI_INT, 0, MPI_COMM_WORLD); 
         MPI_Bcast(&x_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
         MPI_Bcast(&y_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+    } 
+
+    if (myid == 0) { 
+        printf("Iterations:\n");
     } 
 
     // Generating the appropriate amount of paths
@@ -117,6 +119,8 @@ int main( int argc, char *argv[] )
                 consec_conv = 0;
                 ref = (1.0*sum_main)/(i*numprocs);
             }
+            if(i%(10000)==0)
+                printf("%dx%d ", i, numprocs);
         }
         MPI_Bcast(&finalize, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
         if(finalize)
@@ -125,7 +129,7 @@ int main( int argc, char *argv[] )
     
     if (myid == 0)
     {  
-        printf("Temperature at point is %.16f.\n", ref);
+        printf("\nTemperature at point is %.16f.\n", ref);
         printf("Calculated after %d iterations\n", i*numprocs); 
     }
 
