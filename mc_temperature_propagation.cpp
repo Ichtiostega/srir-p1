@@ -1,5 +1,6 @@
 #include "mpi.h" 
 #include <stdio.h> 
+#include <stdlib.h>
 #include <math.h>
 #include "sprng_cpp.h"
 
@@ -37,20 +38,27 @@ int main( int argc, char *argv[] )
 
     // Choosing amount of times that we generate
     // a path to the sides of the plate. 
-    if (myid == 0) { 
-        printf("Enter the number o iterations: "); 
-        scanf("%d",&n);
-        printf("Enter x coordinate of point[1-19]: "); 
-        scanf("%d",&x_init);
-        printf("Enter y coordinate of point[1-19]: "); 
-        scanf("%d",&y_init);
-        
-    } 
+    if (argc >= 4) {  
+        n       = atoi(argv[1]);
+        x_init  = atoi(argv[2]);
+        y_init  = atoi(argv[3]);
+    }
+    else
+    {
+        if (myid == 0) { 
+            printf("Enter the number o iterations: "); 
+            scanf("%d",&n);
+            printf("Enter x coordinate of point[1-19]: "); 
+            scanf("%d",&x_init);
+            printf("Enter y coordinate of point[1-19]: "); 
+            scanf("%d",&y_init);
+        } 
 
-    // Broadcasting the number of iterations
-    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD); 
-    MPI_Bcast(&x_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
-    MPI_Bcast(&y_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+        // Broadcasting the number of iterations
+        MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+        MPI_Bcast(&x_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+        MPI_Bcast(&y_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+    } 
 
     // Generating the appropriate amount of paths
     // and accumulating the values a the end.
@@ -88,7 +96,7 @@ int main( int argc, char *argv[] )
     MPI_Reduce(&sum, &sum_main, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); 
 
     if (myid == 0)  
-        printf("Temperature at point is %.16f.", (1.0*sum_main)/((n/numprocs)*numprocs)); 
+        printf("Temperature at point is %.16f.\n", (1.0*sum_main)/((n/numprocs)*numprocs)); 
 
     stream->free_sprng();
     MPI_Finalize(); 
