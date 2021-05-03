@@ -8,6 +8,15 @@ $(EXEC): $(EXEC).cpp
 run: nodes $(EXEC)
 	mpiexec -f nodes -n $$(( 2 * $$(cat nodes | wc -l) )) ./$(EXEC)
 
+test: nodes $(EXEC)
+	mpiexec -f nodes -n $$(( 2 * $$(cat nodes | wc -l) )) ./$(EXEC) 0.01 10 10
+	@echo "Expected value: ~25"
+	mpiexec -f nodes -n $$(( 2 * $$(cat nodes | wc -l) )) ./$(EXEC) 0.01 10 1
+	@echo "Expected value: ~25"
+	mpiexec -f nodes -n $$(( 2 * $$(cat nodes | wc -l) )) ./$(EXEC) 0.01 10 19
+	@echo "Expected value: ~25"
+	mpiexec -f nodes -n $$(( 2 * $$(cat nodes | wc -l) )) ./$(EXEC) 0.01 19 19
+	@echo "Expected value: ~25"
 nodes:
 	/opt/nfs/config/station_name_list.sh 101 116 > nodes
 

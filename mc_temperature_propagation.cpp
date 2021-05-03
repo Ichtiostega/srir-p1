@@ -4,7 +4,7 @@
 #include <math.h>
 #include "sprng_cpp.h"
 
-#define SEED 985456376
+#define SEED 385456376
 
 #define XSIZE 20
 #define YSIZE 20
@@ -20,7 +20,8 @@ int is_border(int x, int y){
 
 int main( int argc, char *argv[] ) 
 { 
-    int n = 0, myid = 0, numprocs = 1; 
+    int myid = 0, numprocs = 1;
+    double s = 0.01; 
     int x_init = 10, y_init = 10;
     MPI_Init(&argc,&argv); 
     MPI_Comm_size(MPI_COMM_WORLD,&numprocs); 
@@ -39,15 +40,15 @@ int main( int argc, char *argv[] )
     // Choosing amount of times that we generate
     // a path to the sides of the plate. 
     if (argc >= 4) {  
-        n       = atoi(argv[1]);
+        s       = atof(argv[1]);
         x_init  = atoi(argv[2]);
         y_init  = atoi(argv[3]);
     }
     else
     {
         if (myid == 0) { 
-            printf("Enter the number o iterations: "); 
-            scanf("%d",&n);
+            printf("Enter sensitivity for end condition (ex. 0.01): "); 
+            scanf("%f",&s);
             printf("Enter x coordinate of point[1-19]: "); 
             scanf("%d",&x_init);
             printf("Enter y coordinate of point[1-19]: "); 
@@ -55,15 +56,21 @@ int main( int argc, char *argv[] )
         } 
 
         // Broadcasting the number of iterations
-        MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+        // MPI_Bcast(&s, 1, MPI_INT, 0, MPI_COMM_WORLD); 
         MPI_Bcast(&x_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
         MPI_Bcast(&y_init, 1, MPI_INT, 0, MPI_COMM_WORLD); 
     } 
 
     // Generating the appropriate amount of paths
     // and accumulating the values a the end.
+    bool finalize = false;
+    int i = 0;
+    int consec_conv = 0;
+    int sum_main = 0;
     int sum = 0; 
-    for (int i = 0; i <= n/numprocs; i++) {
+    double ref = 0.0;
+    while(1) {
+        i++;
         int x = x_init;
         int y = y_init; 
         while(1)
@@ -91,12 +98,36 @@ int main( int argc, char *argv[] )
                 break;
             }
         }
+        MPI_Reduce(&sum, &sum_main, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);    
+        if (myid == 0)
+        {
+            if(fabs((1.0*sum_main)/(i*numprocs) - ref) < s && sum_main!=0)
+            {
+                if(consec_conv==0)
+                    ref = (1.0*sum_main)/(i*numprocs);
+                else if(consec_conv==20000)
+                {
+                    ref = (1.0*sum_main)/(i*numprocs);
+                    finalize = true; 
+                }
+                consec_conv++;
+            }
+            else
+            {
+                consec_conv = 0;
+                ref = (1.0*sum_main)/(i*numprocs);
+            }
+        }
+        MPI_Bcast(&finalize, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+        if(finalize)
+            break;
     }
-    int sum_main = sum;
-    MPI_Reduce(&sum, &sum_main, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD); 
-
-    if (myid == 0)  
-        printf("Temperature at point is %.16f.\n", (1.0*sum_main)/((n/numprocs)*numprocs)); 
+    
+    if (myid == 0)
+    {  
+        printf("Temperature at point is %.16f.\n", ref);
+        printf("Calculated after %d iterations\n", i*numprocs); 
+    }
 
     stream->free_sprng();
     MPI_Finalize(); 
