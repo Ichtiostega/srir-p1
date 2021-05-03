@@ -22,6 +22,9 @@ int main(int argc, char *argv[])
     int myid = 0, numprocs = 1;
     double s = 0.01;
     int x_init = 10, y_init = 10;
+
+    //MPI initialization
+
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -30,14 +33,11 @@ int main(int argc, char *argv[])
 
     Sprng *stream;
     int streamnum = myid;
-    int nstreams = numprocs;
-    int gtype = 3;
-    MPI_Bcast(&gtype, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    stream = SelectType(gtype);
-    stream->init_sprng(streamnum, nstreams, make_sprng_seed(), SPRNG_DEFAULT);
+    stream = SelectType(3);
+    stream->init_sprng(streamnum, numprocs, make_sprng_seed(), SPRNG_DEFAULT);
 
-    // Choosing amount of times that we generate
-    // a path to the sides of the plate.
+    // Chosing the point which temperature is to be computed
+    // and the tolerance for the end condition
     if (argc >= 4)
     {
         s = atof(argv[1]);
@@ -56,8 +56,7 @@ int main(int argc, char *argv[])
             scanf("%d", &y_init);
         }
 
-        // Broadcasting the number of iterations
-        // MPI_Bcast(&s, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        // Broadcasting the point coordinates
         MPI_Bcast(&x_init, 1, MPI_INT, 0, MPI_COMM_WORLD);
         MPI_Bcast(&y_init, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }
@@ -67,8 +66,8 @@ int main(int argc, char *argv[])
         printf("Iterations:\n");
     }
 
-    // Generating the appropriate amount of paths
-    // and accumulating the values a the end.
+    // Generating paths until the mean of encountered temperatures
+    // is consistent for 20000 iterations
     bool finalize = false;
     int i = 0;
     int consec_conv = 0;
@@ -133,11 +132,15 @@ int main(int argc, char *argv[])
             break;
     }
 
+    // Printing the final outcome
+
     if (myid == 0)
     {
         printf("\nTemperature at point is %.16f.\n", ref);
         printf("Calculated after %d iterations\n", i * numprocs);
     }
+
+    // Cleanup
 
     stream->free_sprng();
     MPI_Finalize();
